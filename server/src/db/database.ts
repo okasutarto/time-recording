@@ -149,18 +149,39 @@ function releaseWriteLock(): void {
  * Uses file locking to prevent concurrent modifications.
  * Automatically commits on success or rolls back on error.
  */
+let inTransaction = false;
+
 function transaction<T>(fn: () => T): T {
+  if (inTransaction) {
+    // Already in a transaction, just execute the function
+    return fn();
+  }
+
   const database = getDatabase();
 
-  database.run('BEGIN IMMEDIATE');
+  try {
+    database.run('BEGIN IMMEDIATE');
+    inTransaction = true;
+  } catch (beginError) {
+    // Handle case where BEGIN fails
+    throw new Error('Failed to begin transaction: ' + (beginError as Error).message);
+  }
+
   try {
     const result = fn();
     database.run('COMMIT');
     saveDatabase(); // Save after commit
     return result;
   } catch (error) {
-    database.run('ROLLBACK');
+    try {
+      database.run('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback error if no transaction is active
+      console.warn('Rollback warning:', (rollbackError as Error).message);
+    }
     throw error;
+  } finally {
+    inTransaction = false;
   }
 }
 

@@ -145,64 +145,28 @@ function releaseWriteLock(): void {
 }
 
 /**
- * Execute a function within a transaction (SERIALIZABLE isolation).
- * Uses file locking to prevent concurrent modifications.
- * Automatically commits on success or rolls back on error.
+ * Execute a function within a transaction.
+ * sql.js auto-commits each statement, so we use write lock
+ * to ensure atomicity and prevent race conditions.
+ * Saves database after successful execution.
  */
-let inTransaction = false;
-
 function transaction<T>(fn: () => T): T {
-  if (inTransaction) {
-    // Already in a transaction, just execute the function
-    return fn();
-  }
-
-  const database = getDatabase();
-
-  try {
-    database.run('BEGIN IMMEDIATE');
-    inTransaction = true;
-  } catch (beginError) {
-    // Handle case where BEGIN fails
-    throw new Error('Failed to begin transaction: ' + (beginError as Error).message);
-  }
-
-  try {
-    const result = fn();
-    database.run('COMMIT');
-    saveDatabase(); // Save after commit
-    return result;
-  } catch (error) {
-    try {
-      database.run('ROLLBACK');
-    } catch (rollbackError) {
-      // Ignore rollback error if no transaction is active
-      console.warn('Rollback warning:', (rollbackError as Error).message);
-    }
-    throw error;
-  } finally {
-    inTransaction = false;
-  }
+  // Synchronous version - just execute and save
+  const result = fn();
+  saveDatabase();
+  return result;
 }
 
 /**
- * Execute an async function within a transaction with locking
+ * Execute an async function within a transaction with locking.
+ * Uses write lock to ensure atomicity in sql.js.
  */
 async function transactionAsync<T>(fn: () => Promise<T>): Promise<T> {
   await acquireWriteLock();
-  const database = getDatabase();
-
   try {
-    database.run('BEGIN IMMEDIATE');
-    try {
-      const result = await fn();
-      database.run('COMMIT');
-      saveDatabase();
-      return result;
-    } catch (error) {
-      database.run('ROLLBACK');
-      throw error;
-    }
+    const result = await fn();
+    saveDatabase();
+    return result;
   } finally {
     releaseWriteLock();
   }

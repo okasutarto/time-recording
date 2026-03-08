@@ -81,7 +81,7 @@ import { User } from './services/types';
 
         <!-- Report View -->
         <div *ngIf="currentView === 'report'" class="space-y-6">
-          <app-report-view [userId]="currentUser?.id ?? null"></app-report-view>
+          <app-report-view [userId]="currentUser?.id ?? null" [activeView]="currentView"></app-report-view>
         </div>
 
         <!-- Schedule View -->

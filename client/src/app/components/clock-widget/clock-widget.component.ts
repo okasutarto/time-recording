@@ -20,7 +20,7 @@ import { ClockStatus, TimeRecord } from '../../services/types';
         <button
           *ngIf="userId"
           (click)="toggleClock()"
-          [disabled]="loading"
+          [disabled]="loading || (!isWorkingDay && !clockStatus?.is_clocked_in)"
           [class]="getButtonClass()"
         >
           <span class="flex items-center justify-center gap-3">
@@ -35,6 +35,10 @@ import { ClockStatus, TimeRecord } from '../../services/types';
             {{ loading ? 'Processing...' : (clockStatus?.is_clocked_in ? 'Clock Out' : 'Clock In') }}
           </span>
         </button>
+
+        <div *ngIf="userId && !isWorkingDay && !clockStatus?.is_clocked_in" class="mt-4 text-amber-600 text-sm">
+          Clock in is disabled on {{ getCurrentDayName() }} (your day off)
+        </div>
 
         <div *ngIf="clockStatus?.current_record" class="mt-6 p-4 bg-slate-50 rounded-lg">
           <div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Current Session</div>
@@ -60,7 +64,9 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
   loading = false;
   currentTime = '';
   currentDate = '';
+  isWorkingDay = true;
   private timeInterval: any;
+  private dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   constructor(private api: ApiService) {
     this.updateTime();
@@ -70,8 +76,10 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges) {
     if (changes['userId'] && this.userId) {
       this.loadStatus();
+      this.loadSchedule();
     } else if (changes['userId'] && !this.userId) {
       this.clockStatus = null;
+      this.isWorkingDay = true;
     }
   }
 
@@ -87,7 +95,7 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false
+      hour12: true
     });
     this.currentDate = now.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -102,6 +110,18 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
     this.api.getClockStatus(this.userId).subscribe({
       next: (status) => (this.clockStatus = status),
       error: (err) => console.error('Failed to load clock status:', err)
+    });
+  }
+
+  loadSchedule() {
+    if (!this.userId) return;
+    this.api.getSchedule(this.userId).subscribe({
+      next: (schedule) => {
+        const today = new Date().getDay();
+        const todaySchedule = schedule.find(s => s.day_of_week === today);
+        this.isWorkingDay = todaySchedule ? todaySchedule.is_working_day : true;
+      },
+      error: (err) => console.error('Failed to load schedule:', err)
     });
   }
 
@@ -130,13 +150,21 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
     if (this.clockStatus?.is_clocked_in) {
       return base + 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:shadow-emerald-300';
     }
+    if (!this.isWorkingDay) {
+      return base + 'bg-slate-300 text-slate-500 cursor-not-allowed';
+    }
     return base + 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300';
+  }
+
+  getCurrentDayName(): string {
+    return this.dayNames[new Date().getDay()];
   }
 
   formatTime(isoString: string): string {
     return new Date(isoString).toLocaleTimeString('en-US', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   }
 

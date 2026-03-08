@@ -50,6 +50,10 @@ interface DaySchedule {
         >
           {{ saving ? 'Saving...' : 'Save Schedule' }}
         </button>
+
+        <div *ngIf="autoClockedOut" class="mt-3 p-2 bg-amber-100 text-amber-700 text-sm rounded-lg text-center">
+          You have been automatically clocked out (day changed to off)
+        </div>
       </div>
     </div>
   `
@@ -60,6 +64,7 @@ export class WorkScheduleConfigComponent implements OnChanges {
   schedule: DaySchedule[] = [];
   loading = false;
   saving = false;
+  autoClockedOut = false;
 
   private dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -68,6 +73,7 @@ export class WorkScheduleConfigComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (changes['userId'] && this.userId) {
       this.loadSchedule();
+      this.autoClockedOut = false;
     } else if (changes['userId'] && !this.userId) {
       this.schedule = [];
     }
@@ -100,13 +106,44 @@ export class WorkScheduleConfigComponent implements OnChanges {
   saveSchedule() {
     if (!this.userId) return;
     this.saving = true;
+    this.autoClockedOut = false;
+
+    // Check if user is clocked in on any day being changed to off
+    const today = new Date().getDay();
+    const todaySchedule = this.schedule.find(s => s.day_of_week === today);
 
     const schedule = this.schedule.map(d => ({
       day_of_week: d.day_of_week,
       is_working_day: d.is_working_day
     }));
 
-    this.api.updateSchedule(this.userId, schedule).subscribe({
+    // If today is being changed to off, check if user is clocked in
+    if (todaySchedule && !todaySchedule.is_working_day) {
+      this.api.getClockStatus(this.userId).subscribe({
+        next: (status) => {
+          if (status.is_clocked_in) {
+            // Auto clock out
+            this.api.clockOut(this.userId!).subscribe({
+              next: () => {
+                this.autoClockedOut = true;
+              },
+              error: (err) => console.error('Failed to auto clock out:', err)
+            });
+          }
+          this.finalizeSave(schedule);
+        },
+        error: (err) => {
+          console.error('Failed to check clock status:', err);
+          this.finalizeSave(schedule);
+        }
+      });
+    } else {
+      this.finalizeSave(schedule);
+    }
+  }
+
+  finalizeSave(schedule: { day_of_week: number; is_working_day: boolean }[]) {
+    this.api.updateSchedule(this.userId!, schedule).subscribe({
       next: () => {
         this.saving = false;
       },

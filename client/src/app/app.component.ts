@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { UserSelectorComponent } from './components/user-selector/user-selector.component';
@@ -6,6 +6,7 @@ import { ClockWidgetComponent } from './components/clock-widget/clock-widget.com
 import { RecordsListComponent } from './components/records-list/records-list.component';
 import { ReportViewComponent } from './components/report-view/report-view.component';
 import { WorkScheduleConfigComponent } from './components/work-schedule-config/work-schedule-config.component';
+import { ToastComponent } from './components/toast/toast.component';
 import { User } from './services/types';
 
 @Component({
@@ -20,10 +21,12 @@ import { User } from './services/types';
     ClockWidgetComponent,
     RecordsListComponent,
     ReportViewComponent,
-    WorkScheduleConfigComponent
+    WorkScheduleConfigComponent,
+    ToastComponent
   ],
   template: `
     <div class="min-h-screen bg-slate-50">
+      <app-toast></app-toast>
       <!-- Header -->
       <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -93,13 +96,11 @@ import { User } from './services/types';
   `,
   styles: []
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
   currentUser: User | null = null;
   currentView = 'dashboard';
 
   constructor(private router: Router) {}
-
-  ngOnInit() {}
 
   onUserSelected(user: User | null) {
     this.currentUser = user;

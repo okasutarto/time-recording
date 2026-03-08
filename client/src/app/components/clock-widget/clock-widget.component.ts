@@ -66,7 +66,7 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
   currentTime = '';
   currentDate = '';
   isWorkingDay = true;
-  private timeInterval: any;
+  private timeInterval: ReturnType<typeof setInterval> | null = null;
   private dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   constructor(
@@ -95,7 +95,7 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.timeInterval) {
+    if (this.timeInterval !== null) {
       clearInterval(this.timeInterval);
     }
   }

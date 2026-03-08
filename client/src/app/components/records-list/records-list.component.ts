@@ -40,7 +40,7 @@ import { TimeRecord, UpdateTimeRecordInput } from '../../services/types';
 
       <div *ngIf="records.length > 0" class="divide-y divide-slate-100">
         <div
-          *ngFor="let record of records"
+          *ngFor="let record of records; trackBy: trackByRecordId"
           class="px-6 py-4 hover:bg-slate-50 transition-colors duration-150"
         >
           <div class="flex items-center justify-between">
@@ -276,6 +276,10 @@ export class RecordsListComponent implements OnChanges, OnDestroy {
       minute: '2-digit',
       hour12: true
     });
+  }
+
+  trackByRecordId(index: number, record: TimeRecord): number {
+    return record.id;
   }
 
   calculateHours(record: TimeRecord): string {

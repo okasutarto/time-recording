@@ -1,12 +1,15 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
+import { ToastService } from '../services/toast.service';
 
 /**
  * Global HTTP error interceptor that handles common error cases.
  * Provides user-friendly error messages and logging.
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
+  const toastService = inject(ToastService);
+
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
       let errorMessage = 'An unexpected error occurred';
@@ -36,6 +39,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
             errorMessage = error.error?.error || errorMessage;
         }
       }
+
+      // Show toast notification for errors
+      toastService.error(errorMessage);
 
       console.error('HTTP Error:', {
         status: error.status,

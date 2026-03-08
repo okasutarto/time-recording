@@ -80,6 +80,7 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
     this.scheduleService.onScheduleChanged().subscribe(() => {
       if (this.userId) {
         this.loadSchedule();
+        this.loadStatus();
       }
     });
   }

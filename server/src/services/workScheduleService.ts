@@ -1,4 +1,4 @@
-import { runQuery, getOne, getAll, runAndGetChanges } from '../db/database';
+import { runQuery, getOne, getAll, runAndGetChanges, transaction } from '../db/database';
 import { WorkSchedule, WorkConfig, WorkScheduleInput, UpdateWorkConfigInput } from '../types';
 
 export class WorkConfigService {
@@ -30,18 +30,20 @@ export class WorkScheduleService {
   }
 
   static setUserSchedule(userId: number, schedule: WorkScheduleInput[]): WorkSchedule[] {
-    // Delete existing schedule
-    runQuery('DELETE FROM work_schedules WHERE user_id = ?', [userId]);
+    return transaction(() => {
+      // Delete existing schedule
+      runQuery('DELETE FROM work_schedules WHERE user_id = ?', [userId]);
 
-    // Insert new schedule
-    for (const day of schedule) {
-      runQuery(
-        'INSERT INTO work_schedules (user_id, day_of_week, is_working_day) VALUES (?, ?, ?)',
-        [userId, day.day_of_week, day.is_working_day ? 1 : 0]
-      );
-    }
+      // Insert new schedule
+      for (const day of schedule) {
+        runQuery(
+          'INSERT INTO work_schedules (user_id, day_of_week, is_working_day) VALUES (?, ?, ?)',
+          [userId, day.day_of_week, day.is_working_day ? 1 : 0]
+        );
+      }
 
-    return this.getUserSchedule(userId);
+      return this.getUserSchedule(userId);
+    });
   }
 
   static isWorkingDay(userId: number, date: Date): boolean {

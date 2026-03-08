@@ -8,16 +8,13 @@ const router = Router();
 router.post('/', (req: Request, res: Response) => {
   try {
     const input = req.body as CreateUserInput;
-    if (!input.name || !input.email) {
-      return res.status(400).json({ error: 'Name and email are required' });
+    if (!input.name) {
+      return res.status(400).json({ error: 'Name is required' });
     }
 
     const user = UserService.createUser(input);
     res.status(201).json(user);
   } catch (error: any) {
-    if (error.message === 'UNIQUE constraint failed: users.email') {
-      return res.status(409).json({ error: 'Email already exists' });
-    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });

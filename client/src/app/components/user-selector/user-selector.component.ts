@@ -70,15 +70,6 @@ import { User, CreateUserInput } from '../../services/types';
               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
-            <input
-              [(ngModel)]="newUserEmail"
-              type="email"
-              placeholder="Enter email"
-              class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
         </div>
 
         <!-- Modal Footer -->
@@ -91,7 +82,7 @@ import { User, CreateUserInput } from '../../services/types';
           </button>
           <button
             (click)="createUser()"
-            [disabled]="!newUserName || !newUserEmail"
+            [disabled]="!newUserName"
             class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
             Create User
@@ -108,7 +99,6 @@ export class UserSelectorComponent implements OnInit {
   selectedUserId: number | null = null;
   showCreateForm = false;
   newUserName = '';
-  newUserEmail = '';
 
   constructor(private api: ApiService) {}
 
@@ -137,15 +127,13 @@ export class UserSelectorComponent implements OnInit {
   closeModal() {
     this.showCreateForm = false;
     this.newUserName = '';
-    this.newUserEmail = '';
   }
 
   createUser() {
-    if (!this.newUserName || !this.newUserEmail) return;
+    if (!this.newUserName) return;
 
     const input: CreateUserInput = {
-      name: this.newUserName,
-      email: this.newUserEmail
+      name: this.newUserName
     };
 
     this.api.createUser(input).subscribe({

@@ -4,8 +4,8 @@ import { User, CreateUserInput, UpdateUserInput } from '../types';
 export class UserService {
   static createUser(input: CreateUserInput): User {
     const id = insertAndGetId(
-      'INSERT INTO users (name, email) VALUES (?, ?)',
-      [input.name, input.email]
+      'INSERT INTO users (name) VALUES (?)',
+      [input.name]
     );
     return this.getUserById(id)!;
   }
@@ -23,18 +23,13 @@ export class UserService {
     if (!existing) return undefined;
 
     const name = input.name ?? existing.name;
-    const email = input.email ?? existing.email;
 
-    runQuery('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, id]);
+    runQuery('UPDATE users SET name = ? WHERE id = ?', [name, id]);
     return this.getUserById(id);
   }
 
   static deleteUser(id: number): boolean {
     const changes = runAndGetChanges('DELETE FROM users WHERE id = ?', [id]);
     return changes > 0;
-  }
-
-  static getUserByEmail(email: string): User | undefined {
-    return getOne('SELECT * FROM users WHERE email = ?', [email]);
   }
 }

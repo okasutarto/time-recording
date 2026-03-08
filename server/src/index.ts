@@ -1,6 +1,11 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
 import { initializeDatabase, closeDatabase } from './db/database';
 import userRoutes from './routes/users';
 import clockRoutes from './routes/clock';

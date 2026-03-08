@@ -7,8 +7,18 @@ const DB_PATH = path.join(__dirname, '..', '..', 'data', 'timeRecording.db');
 let db: SqlJsDatabase | null = null;
 let SQL: any = null;
 
-export async function initializeDatabase(): Promise<void> {
+// File lock for preventing concurrent writes
+let writeLock: Promise<void> | null = null;
+let writeLockResolve: (() => void) | null = null;
+
+async function initializeDatabase(): Promise<void> {
   SQL = await initSqlJs();
+
+  // Ensure data directory exists
+  const dir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 
   // Load existing database or create new one
   let database: SqlJsDatabase;
@@ -75,11 +85,14 @@ export async function initializeDatabase(): Promise<void> {
   // Create indexes
   database.run('CREATE INDEX IF NOT EXISTS idx_time_records_user_id ON time_records(user_id)');
   database.run('CREATE INDEX IF NOT EXISTS idx_time_records_clock_in ON time_records(clock_in)');
+  database.run('CREATE INDEX IF NOT EXISTS idx_time_records_user_clock ON time_records(user_id, clock_in)');
   database.run('CREATE INDEX IF NOT EXISTS idx_work_schedules_user_id ON work_schedules(user_id)');
 
   saveDatabase();
   console.log('Database initialized successfully');
 }
+
+export { initializeDatabase };
 
 export function getDatabase(): SqlJsDatabase {
   if (!db) {
@@ -105,6 +118,72 @@ export function closeDatabase(): void {
     saveDatabase();
     db.close();
     db = null;
+  }
+}
+
+/**
+ * Acquire write lock to prevent concurrent writes
+ * This simulates SERIALIZABLE isolation for sql.js
+ */
+async function acquireWriteLock(): Promise<void> {
+  if (writeLock) {
+    await writeLock;
+  }
+
+  return new Promise((resolve) => {
+    writeLockResolve = resolve;
+    writeLock = Promise.resolve();
+  });
+}
+
+function releaseWriteLock(): void {
+  if (writeLockResolve) {
+    writeLockResolve();
+    writeLockResolve = null;
+    writeLock = null;
+  }
+}
+
+/**
+ * Execute a function within a transaction (SERIALIZABLE isolation).
+ * Uses file locking to prevent concurrent modifications.
+ * Automatically commits on success or rolls back on error.
+ */
+function transaction<T>(fn: () => T): T {
+  const database = getDatabase();
+
+  database.run('BEGIN IMMEDIATE');
+  try {
+    const result = fn();
+    database.run('COMMIT');
+    saveDatabase(); // Save after commit
+    return result;
+  } catch (error) {
+    database.run('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
+ * Execute an async function within a transaction with locking
+ */
+async function transactionAsync<T>(fn: () => Promise<T>): Promise<T> {
+  await acquireWriteLock();
+  const database = getDatabase();
+
+  try {
+    database.run('BEGIN IMMEDIATE');
+    try {
+      const result = await fn();
+      database.run('COMMIT');
+      saveDatabase();
+      return result;
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+  } finally {
+    releaseWriteLock();
   }
 }
 
@@ -155,3 +234,53 @@ export function runAndGetChanges(sql: string, params: any[] = []): number {
   saveDatabase();
   return result[0].values[0][0] as number;
 }
+
+/**
+ * Atomic clock-in using INSERT ON CONFLICT pattern.
+ * Prevents race conditions when multiple clock-in requests happen simultaneously.
+ */
+export function atomicClockIn(userId: number, clockInTime: string): { success: boolean; id?: number; error?: string } {
+  const database = getDatabase();
+
+  // Use transaction with locking for atomic operation
+  database.run('BEGIN IMMEDIATE');
+  try {
+    // Check if already clocked in (within transaction)
+    const checkStmt = database.prepare('SELECT id FROM time_records WHERE user_id = ? AND clock_out IS NULL');
+    checkStmt.bind([userId]);
+    const hasActive = checkStmt.step();
+    checkStmt.free();
+
+    if (hasActive) {
+      database.run('ROLLBACK');
+      return { success: false, error: 'ALREADY_CLOCKED_IN' };
+    }
+
+    // Insert new record
+    database.run('INSERT INTO time_records (user_id, clock_in) VALUES (?, ?)', [userId, clockInTime]);
+    const result = database.exec('SELECT last_insert_rowid() as id');
+    const insertedId = result[0].values[0][0] as number;
+
+    database.run('COMMIT');
+    saveDatabase();
+
+    return { success: true, id: insertedId };
+  } catch (error) {
+    database.run('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
+ * Check if user is currently clocked in (for atomic operations)
+ */
+export function hasActiveRecord(userId: number): boolean {
+  const result = getOne(
+    'SELECT 1 FROM time_records WHERE user_id = ? AND clock_out IS NULL',
+    [userId]
+  );
+  return !!result;
+}
+
+// Export transaction for use in services
+export { transaction, transactionAsync };

@@ -25,20 +25,25 @@ router.post('/', (req: Request, res: Response) => {
     if (error.message === 'INVALID_TIME_RANGE') {
       return res.status(400).json({ error: 'clock_out must be after clock_in' });
     }
+    if (error.message === 'OVERLAP_DETECTED') {
+      return res.status(400).json({ error: 'Time record overlaps with an existing record' });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get all records for user
+// Get all records for user (with pagination)
 router.get('/:userId', (req: Request, res: Response) => {
   const userId = parseInt(req.params.userId);
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+  const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
 
   const user = UserService.getUserById(userId);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  const records = TimeRecordService.getRecordsByUserId(userId);
+  const records = TimeRecordService.getRecordsByUserId(userId, limit, offset);
   res.json(records);
 });
 
@@ -70,6 +75,9 @@ router.put('/:userId/:id', (req: Request, res: Response) => {
   } catch (error: any) {
     if (error.message === 'INVALID_TIME_RANGE') {
       return res.status(400).json({ error: 'clock_out must be after clock_in' });
+    }
+    if (error.message === 'OVERLAP_DETECTED') {
+      return res.status(400).json({ error: 'Time record overlaps with an existing record' });
     }
     res.status(500).json({ error: 'Internal server error' });
   }

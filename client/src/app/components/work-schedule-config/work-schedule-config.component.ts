@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
+import { ScheduleService } from '../../services/schedule.service';
 
 interface DaySchedule {
   day_of_week: number;
@@ -68,7 +69,10 @@ export class WorkScheduleConfigComponent implements OnChanges {
 
   private dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService,
+    private scheduleService: ScheduleService
+  ) {}
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['userId'] && this.userId) {
@@ -146,6 +150,7 @@ export class WorkScheduleConfigComponent implements OnChanges {
     this.api.updateSchedule(this.userId!, schedule).subscribe({
       next: () => {
         this.saving = false;
+        this.scheduleService.notifyScheduleChanged();
       },
       error: (err) => {
         console.error('Failed to save schedule:', err);

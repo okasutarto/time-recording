@@ -1,7 +1,9 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../services/api.service';
+import { ScheduleService } from '../../services/schedule.service';
 import { Report } from '../../services/types';
 
 @Component({
@@ -89,12 +91,12 @@ import { Report } from '../../services/types';
         <!-- Summary -->
         <div class="grid grid-cols-4 gap-4 p-6 bg-slate-50 border-b border-slate-100">
           <div class="text-center">
-            <div class="text-2xl font-bold text-slate-800">{{ report.summary.total_worked_hours.toFixed(1) }}</div>
+            <div class="text-2xl font-bold text-slate-800">{{ formatHours(report.summary.total_worked_hours) }}</div>
             <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Total Hours</div>
           </div>
           <div class="text-center">
             <div class="text-2xl font-bold" [class]="report.summary.total_overtime_hours > 0 ? 'text-amber-600' : 'text-slate-800'">
-              {{ report.summary.total_overtime_hours.toFixed(1) }}
+              {{ formatHours(report.summary.total_overtime_hours) }}
             </div>
             <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Overtime</div>
           </div>
@@ -128,10 +130,10 @@ import { Report } from '../../services/types';
             <div class="flex items-center gap-4">
               <div *ngIf="day.is_working_day" class="text-right">
                 <div class="text-sm font-medium" [class]="day.overtime_hours > 0 ? 'text-amber-600' : 'text-slate-700'">
-                  {{ day.worked_hours.toFixed(2) }}h
+                  {{ formatHours(day.worked_hours) }}
                 </div>
                 <div *ngIf="day.overtime_hours > 0" class="text-xs text-amber-500">
-                  +{{ day.overtime_hours.toFixed(2) }}h overtime
+                  +{{ formatHours(day.overtime_hours) }} overtime
                 </div>
               </div>
               <div *ngIf="!day.is_working_day" class="text-right">
@@ -144,7 +146,7 @@ import { Report } from '../../services/types';
     </div>
   `
 })
-export class ReportViewComponent implements OnChanges {
+export class ReportViewComponent implements OnChanges, OnDestroy {
   @Input() userId: number | null = null;
   @Input() activeView: string = '';
 
@@ -154,9 +156,22 @@ export class ReportViewComponent implements OnChanges {
   startDate = '';
   endDate = '';
   activePreset = 'last7';
+  private clockSubscription?: Subscription;
 
-  constructor(private api: ApiService) {
+  constructor(
+    private api: ApiService,
+    private scheduleService: ScheduleService
+  ) {
     this.setDefaultDates();
+    this.clockSubscription = this.scheduleService.onClockChanged().subscribe(() => {
+      if (this.userId) {
+        this.loadReport();
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.clockSubscription?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -249,5 +264,16 @@ export class ReportViewComponent implements OnChanges {
       minute: '2-digit',
       hour12: true
     });
+  }
+
+  formatHours(decimalHours: number): string {
+    if (!decimalHours || decimalHours === 0) return '0h 0m 0s';
+
+    const totalSeconds = Math.round(decimalHours * 3600);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
 }

@@ -1,6 +1,8 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../services/api.service';
+import { ScheduleService } from '../../services/schedule.service';
 import { TimeRecord } from '../../services/types';
 
 @Component({
@@ -56,7 +58,7 @@ import { TimeRecord } from '../../services/types';
                 {{ calculateHours(record) }}
               </div>
               <div class="text-xs text-slate-400 uppercase tracking-wide">
-                hours
+                duration
               </div>
             </div>
           </div>
@@ -65,13 +67,27 @@ import { TimeRecord } from '../../services/types';
     </div>
   `
 })
-export class RecordsListComponent implements OnChanges {
+export class RecordsListComponent implements OnChanges, OnDestroy {
   @Input() userId: number | null = null;
 
   records: TimeRecord[] = [];
   loading = false;
+  private clockSubscription?: Subscription;
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService,
+    private scheduleService: ScheduleService
+  ) {
+    this.clockSubscription = this.scheduleService.onClockChanged().subscribe(() => {
+      if (this.userId) {
+        this.loadRecords();
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.clockSubscription?.unsubscribe();
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['userId'] && this.userId) {
@@ -120,8 +136,12 @@ export class RecordsListComponent implements OnChanges {
 
     const start = new Date(record.clock_in);
     const end = new Date(record.clock_out);
-    const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    const totalSeconds = Math.floor((end.getTime() - start.getTime()) / 1000);
 
-    return hours.toFixed(2);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
 }

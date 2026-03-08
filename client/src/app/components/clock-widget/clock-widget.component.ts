@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
+import { ScheduleService } from '../../services/schedule.service';
 import { ClockStatus, TimeRecord } from '../../services/types';
 
 @Component({
@@ -68,9 +69,19 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
   private timeInterval: any;
   private dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  constructor(private api: ApiService) {
+  constructor(
+    private api: ApiService,
+    private scheduleService: ScheduleService
+  ) {
     this.updateTime();
     this.timeInterval = setInterval(() => this.updateTime(), 1000);
+
+    // Listen for schedule changes from other components
+    this.scheduleService.onScheduleChanged().subscribe(() => {
+      if (this.userId) {
+        this.loadSchedule();
+      }
+    });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -137,6 +148,7 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
       next: () => {
         this.loadStatus();
         this.loading = false;
+        this.scheduleService.notifyClockChanged();
       },
       error: (err) => {
         console.error('Clock action failed:', err);
@@ -175,7 +187,8 @@ export class ClockWidgetComponent implements OnChanges, OnDestroy {
 
     const hours = Math.floor(diff / 3600);
     const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
 
-    return `Elapsed: ${hours}h ${minutes}m`;
+    return `Elapsed: ${hours}h ${minutes}m ${seconds}s`;
   }
 }

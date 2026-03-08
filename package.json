@@ -1,0 +1,11 @@
+{
+  "name": "time-recording-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "start": "npm run server & npm run client"
+  }
+}

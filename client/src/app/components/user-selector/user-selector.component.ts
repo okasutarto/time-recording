@@ -2,6 +2,7 @@ import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { ToastService } from '../../services/toast.service';
 import { User, CreateUserInput, UpdateUserInput } from '../../services/types';
 
 @Component({
@@ -213,7 +214,10 @@ export class UserSelectorComponent implements OnInit {
   editUserName = '';
   editingUserId: number | null = null;
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService,
+    private toast: ToastService
+  ) {}
 
   ngOnInit() {
     this.loadUsers();
@@ -282,6 +286,7 @@ export class UserSelectorComponent implements OnInit {
         this.selectedUserId = user.id;
         this.closeModal();
         this.onUserSelected();
+        this.toast.success(`User "${user.name}" created successfully`);
       },
       error: (err) => console.error('Failed to create user:', err)
     });

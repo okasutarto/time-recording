@@ -13,12 +13,13 @@ import {
   UpdateTimeRecordInput,
   UpdateWorkConfigInput
 } from './types';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private baseUrl = 'http://localhost:3000';
+  private baseUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 

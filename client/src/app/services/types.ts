@@ -66,7 +66,7 @@ export interface CreateTimeRecordInput {
 
 export interface UpdateTimeRecordInput {
   clock_in?: string;
-  clock_out?: string;
+  clock_out?: string | null;
 }
 
 export interface UpdateWorkConfigInput {

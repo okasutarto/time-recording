@@ -257,6 +257,54 @@ export function atomicClockIn(userId: number, clockInTime: string): { success: b
 }
 
 /**
+ * Atomic clock-out using BEGIN IMMEDIATE transaction.
+ * Prevents race conditions when multiple clock-out requests happen simultaneously.
+ */
+export function atomicClockOut(userId: number, clockOutTime: string): { success: boolean; id?: number; error?: string } {
+  const database = getDatabase();
+
+  // Use BEGIN IMMEDIATE to acquire write lock
+  database.run('BEGIN IMMEDIATE');
+  try {
+    // Check if user has an active record with NULL clock_out
+    const checkStmt = database.prepare('SELECT id, clock_in FROM time_records WHERE user_id = ? AND clock_out IS NULL');
+    checkStmt.bind([userId]);
+    const hasActive = checkStmt.step();
+    let activeId: number | undefined;
+    let clockInTime: string | undefined;
+
+    if (hasActive) {
+      const row = checkStmt.getAsObject();
+      activeId = row.id as number;
+      clockInTime = row.clock_in as string;
+    }
+    checkStmt.free();
+
+    if (!hasActive || !activeId || !clockInTime) {
+      database.run('ROLLBACK');
+      return { success: false, error: 'NOT_CLOCKED_IN' };
+    }
+
+    // Validate clock_out is after clock_in
+    if (new Date(clockOutTime) <= new Date(clockInTime)) {
+      database.run('ROLLBACK');
+      return { success: false, error: 'INVALID_TIME_RANGE' };
+    }
+
+    // Update the record
+    database.run('UPDATE time_records SET clock_out = ?, updated_at = ? WHERE id = ?', [clockOutTime, clockOutTime, activeId]);
+
+    database.run('COMMIT');
+    saveDatabase();
+
+    return { success: true, id: activeId };
+  } catch (error) {
+    database.run('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
  * Check if user is currently clocked in (for atomic operations)
  */
 export function hasActiveRecord(userId: number): boolean {

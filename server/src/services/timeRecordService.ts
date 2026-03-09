@@ -1,4 +1,4 @@
-import { runQuery, getOne, getAll, insertAndGetId, runAndGetChanges, atomicClockIn, transaction } from '../db/database';
+import { runQuery, getOne, getAll, insertAndGetId, runAndGetChanges, atomicClockIn, atomicClockOut } from '../db/database';
 import { TimeRecord, CreateTimeRecordInput, UpdateTimeRecordInput, ClockStatus } from '../types';
 
 export class TimeRecordService {
@@ -16,25 +16,16 @@ export class TimeRecordService {
   }
 
   static clockOut(userId: number): TimeRecord {
-    // Use transaction for atomic operation
-    return transaction(() => {
-      // Check if clocked in
-      const activeRecord = getOne(
-        'SELECT id FROM time_records WHERE user_id = ? AND clock_out IS NULL',
-        [userId]
-      );
-      if (!activeRecord) {
-        throw new Error('NOT_CLOCKED_IN');
-      }
+    const now = new Date().toISOString();
 
-      const now = new Date().toISOString();
-      runQuery(
-        "UPDATE time_records SET clock_out = ?, updated_at = ? WHERE id = ?",
-        [now, now, activeRecord.id]
-      );
+    // Use atomic clock-out to prevent race conditions
+    const result = atomicClockOut(userId, now);
 
-      return this.getRecordById(userId, activeRecord.id)!;
-    });
+    if (!result.success) {
+      throw new Error(result.error || 'NOT_CLOCKED_IN');
+    }
+
+    return this.getRecordById(userId, result.id!)!;
   }
 
   static getClockStatus(userId: number): ClockStatus {

@@ -306,8 +306,8 @@ All API errors return consistent JSON format:
 | `USER_NOT_FOUND` | User does not exist | 404 |
 | `RECORD_NOT_FOUND` | Time record does not exist | 404 |
 | `VALIDATION_ERROR` | Invalid input data | 400 |
-| `INTERNAL_ERROR` | Internal server error | 500 |
-| `Too many requests` | Rate limit exceeded | 429 |
+| `Too many requests, please try again later` | Rate limit exceeded | 429 |
+| `Internal server error` | Internal server error | 500 |
 
 ### Global Error Handler
 
